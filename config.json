@@ -1,0 +1,32 @@
+{
+  "architectures": ["MambaSwarmForCausalLM"],
+  "auto_map": {
+    "AutoConfig": "configuration_mamba_swarm.MambaSwarmConfig",
+    "AutoModelForCausalLM": "modeling_mamba_swarm.MambaSwarmForCausalLM"
+  },
+  "model_type": "mamba_swarm",
+  "num_mamba_encoders": 5,
+  "max_mamba_encoders": 1000,
+  "d_model": 768,
+  "d_state": 16,
+  "d_conv": 4,
+  "expand_factor": 2,
+  "vocab_size": 50257,
+  "max_sequence_length": 2048,
+  "pad_token_id": 50256,
+  "bos_token_id": 50256,
+  "eos_token_id": 50256,
+  "tie_word_embeddings": false,
+  "torch_dtype": "float16",
+  "transformers_version": "4.36.0",
+  "use_cache": true,
+  "gating_config": {
+    "gating_type": "learned",
+    "top_k": 2,
+    "load_balancing_loss_coef": 0.01
+  },
+  "routing_config": {
+    "routing_strategy": "dynamic",
+    "aggregation_method": "weighted_average"
+  }
+} 
