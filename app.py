@@ -606,10 +606,12 @@ class UltimateModelLoader:
             "do_sample": True,
             "pad_token_id": getattr(self.tokenizer, 'pad_token_id', 50256),
             "eos_token_id": getattr(self.tokenizer, 'eos_token_id', 50256),
-            "repetition_penalty": config["repetition_penalty"],
-            "no_repeat_ngram_size": config["no_repeat_ngram_size"],
-            "length_penalty": 1.0,
-            "early_stopping": True
+            "repetition_penalty": max(config["repetition_penalty"], 1.2),  # Increased to prevent repetition
+            "no_repeat_ngram_size": max(config["no_repeat_ngram_size"], 3),  # Increased to prevent repetition
+            "length_penalty": 1.1,  # Slight length penalty to encourage variety
+            "early_stopping": True,
+            "num_beams": 1,  # Use sampling instead of beam search for more variety
+            "top_k": 50  # Add top-k sampling to improve variety
         }
         
         return optimal_params
@@ -1465,6 +1467,11 @@ class UltimateMambaSwarm:
         if not prompt.strip():
             return "Please enter a prompt.", ""
         
+        # Add randomness to prevent identical responses
+        import random
+        random.seed(int(time.time() * 1000) % 2**32)  # Use current time as seed
+        np.random.seed(int(time.time() * 1000) % 2**32)
+        
         try:
             # Handle model switching if requested
             if model_size != "auto" and model_size != self.current_model_size:
@@ -1580,17 +1587,23 @@ COMPREHENSIVE RESPONSE:"""
             
             print(f"📝 Hybrid params: temp={gen_params['temperature']:.2f}, top_p={gen_params['top_p']:.2f}")
             
-            # Tokenize hybrid prompt
+            # Tokenize hybrid prompt with uniqueness
+            hybrid_prompt_unique = f"{hybrid_prompt} [Session: {int(time.time())}]"
             inputs = self.model_loader.tokenizer.encode(
-                hybrid_prompt, 
+                hybrid_prompt_unique, 
                 return_tensors="pt", 
                 truncation=True, 
-                max_length=700  # Larger context for web data
+                max_length=650,  # Smaller to account for session marker
+                add_special_tokens=True
             )
             inputs = inputs.to(self.model_loader.device)
             
             # Generate with hybrid intelligence
             with torch.no_grad():
+                # Clear any cached states to prevent repetition
+                if hasattr(self.model_loader.model, 'reset_cache'):
+                    self.model_loader.model.reset_cache()
+                
                 outputs = self.model_loader.model.generate(inputs, **gen_params)
             
             # Decode and validate
@@ -1599,10 +1612,15 @@ COMPREHENSIVE RESPONSE:"""
             # Extract response safely
             if "COMPREHENSIVE RESPONSE:" in generated_text:
                 response = generated_text.split("COMPREHENSIVE RESPONSE:")[-1].strip()
+            elif generated_text.startswith(hybrid_prompt_unique):
+                response = generated_text[len(hybrid_prompt_unique):].strip()
             elif generated_text.startswith(hybrid_prompt):
                 response = generated_text[len(hybrid_prompt):].strip()
             else:
                 response = generated_text.strip()
+            
+            # Clean up any session markers
+            response = re.sub(r'\[Session: \d+\]', '', response).strip()
             
             # Enhanced validation for hybrid responses
             if self._is_inappropriate_content(response):
@@ -1734,29 +1752,41 @@ COMPREHENSIVE RESPONSE:"""
             print(f"📝 Using prompt format: '{safe_prompt[:50]}...'")
             print(f"⚙️  Generation params: temp={gen_params['temperature']:.2f}, top_p={gen_params['top_p']:.2f}")
             
-            # Tokenize with safety
+            # Tokenize with safety and uniqueness
+            prompt_with_timestamp = f"{safe_prompt} [Time: {int(time.time())}]"  # Add timestamp to make each prompt unique
             inputs = self.model_loader.tokenizer.encode(
-                safe_prompt, 
+                prompt_with_timestamp, 
                 return_tensors="pt", 
                 truncation=True, 
-                max_length=512
+                max_length=500,  # Slightly smaller to account for timestamp
+                add_special_tokens=True
             )
             inputs = inputs.to(self.model_loader.device)
             
             # Generate with optimal parameters
             with torch.no_grad():
+                # Clear any cached states
+                if hasattr(self.model_loader.model, 'reset_cache'):
+                    self.model_loader.model.reset_cache()
+                
                 outputs = self.model_loader.model.generate(inputs, **gen_params)
             
             # Decode and validate
             generated_text = self.model_loader.tokenizer.decode(outputs[0], skip_special_tokens=True)
             
-            # Extract response safely
-            if generated_text.startswith(safe_prompt):
+            # Extract response safely and remove timestamp
+            if generated_text.startswith(prompt_with_timestamp):
+                response = generated_text[len(prompt_with_timestamp):].strip()
+            elif generated_text.startswith(safe_prompt):
                 response = generated_text[len(safe_prompt):].strip()
             elif generated_text.startswith(prompt):
                 response = generated_text[len(prompt):].strip()
             else:
                 response = generated_text.strip()
+            
+            # Remove any remaining timestamp artifacts
+            import re
+            response = re.sub(r'\[Time: \d+\]', '', response).strip()
             
             # Content safety filtering
             if self._is_inappropriate_content(response):
@@ -2567,10 +2597,17 @@ def create_ultimate_interface():
             )
         
         # Event handlers
+        def generate_and_clear(prompt, max_length, temperature, top_p, num_encoders, model_size, show_routing, enable_search):
+            """Generate response and clear the input field"""
+            response, routing = swarm.generate_text_ultimate(
+                prompt, max_length, temperature, top_p, num_encoders, model_size, show_routing, enable_search
+            )
+            return response, routing, ""  # Return empty string to clear input
+        
         generate_btn.click(
-            fn=swarm.generate_text_ultimate,
+            fn=generate_and_clear,
             inputs=[prompt_input, max_length, temperature, top_p, num_encoders, model_size, show_routing, enable_search],
-            outputs=[response_output, routing_output]
+            outputs=[response_output, routing_output, prompt_input]  # Include prompt_input in outputs to clear it
         )
         
         refresh_btn.click(
