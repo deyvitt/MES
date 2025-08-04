@@ -1,0 +1,15 @@
+# Requirements for HuggingFace Dataset Integration
+# Install with: pip install -r hf_requirements.txt
+
+# Core HuggingFace
+datasets>=2.14.0
+transformers>=4.35.0
+
+# Your existing requirements (if not already installed)
+torch>=2.0.0
+numpy>=1.24.0
+psutil>=5.9.0
+
+# Optional: For faster data processing
+tokenizers>=0.15.0
+pyarrow>=14.0.0

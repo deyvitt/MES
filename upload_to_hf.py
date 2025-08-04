@@ -5,6 +5,9 @@ import shutil
 from huggingface_hub import HfApi, upload_folder
 import json
 
+# Import the actual model classes
+from modeling_mamba_swarm import MambaSwarmForCausalLM, MambaSwarmConfig
+
 def prepare_model_repo():
     """Prepare model repository structure for HuggingFace"""
     

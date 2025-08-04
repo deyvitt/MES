@@ -1,3 +1,15 @@
+---
+title: Mamba Encoder Swarm
+emoji: 🐍
+colorFrom: green
+colorTo: blue
+sdk: gradio
+sdk_version: "4.0.0"
+app_file: app.py
+pinned: false
+license: mit
+---
+
 # What is M E S ?
 M E S (short for MAMBA ENCODER SWARM) is a novel architecture that comprises of MAMBA's structured state space, configured to implement a multiple encoder swarm that are dynamically, sparsely routed to spread the heavy QxKxV matrix multiplication computional intensity across multiple MAMBA encoders (between 5 to 1000) and with the output sparsely aggregated with a MAMBA decoder, thereby bypassing the high cost of inference without sacrificing on the response generation quality.
 
@@ -324,7 +336,15 @@ This is an additional module to configure and implement the model file for this 
 
 ## File Organization Structure
 ```
-mamba_swarm/
+mamba_encoder_swarm/
+├── app.py                          ✅ main app)
+├── hf_requirements.txt             ✅ (HF dependencies)
+├── training/
+│   ├── trainer.py                  
+│   ├── data_loader.py              
+│   ├── optimizer.py                
+│   ├── loss.py                     
+│   └── enhanced_training.py        
 ├── core/
 │   ├── preprocess.py
 │   ├── tokenizer.py
