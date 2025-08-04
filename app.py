@@ -1152,6 +1152,11 @@ class UltimateMambaSwarm:
                 'semantic_patterns': ['business plan', 'marketing strategy', 'financial analysis', 'company growth'],
                 'context_indicators': ['entrepreneur', 'investment', 'revenue', 'profit']
             },
+            'geography': {
+                'core_terms': ['where', 'location', 'country', 'city', 'capital', 'continent'],
+                'semantic_patterns': ['where is', 'located in', 'capital of', 'geography of', 'map of', 'borders of'],
+                'context_indicators': ['latitude', 'longitude', 'population', 'area', 'region', 'territory']
+            },
             'general': {
                 'core_terms': ['explain', 'what', 'how', 'why', 'describe', 'help'],
                 'semantic_patterns': ['can you explain', 'what is', 'how does', 'why do', 'help me understand'],
@@ -1424,7 +1429,7 @@ class UltimateMambaSwarm:
         domain_ranges = {
             'medical': (1, 20), 'legal': (21, 40), 'code': (41, 60),
             'science': (61, 80), 'creative': (81, 95), 'business': (96, 100),
-            'general': (1, 100)
+            'geography': (15, 35), 'general': (1, 100)
         }
         
         start, end = domain_ranges.get(domain, (1, 100))
@@ -1730,6 +1735,15 @@ COMPREHENSIVE RESPONSE:"""
                 })
                 safe_prompt = f"Scientific Question: {prompt}\nAnalysis:"
                 
+            elif domain == 'geography':
+                # Good parameters for factual geographic information
+                gen_params.update({
+                    "temperature": min(gen_params.get("temperature", 0.4), 0.5),
+                    "top_p": min(gen_params.get("top_p", 0.8), 0.85),
+                    "repetition_penalty": 1.2
+                })
+                safe_prompt = f"Geography Question: {prompt}\nAnswer:"
+                
             elif domain == 'creative':
                 # More creative parameters
                 gen_params.update({
@@ -1849,40 +1863,14 @@ COMPREHENSIVE RESPONSE:"""
         
         print(f"🔍 Quality Check - Domain: {domain}, Response: '{response[:50]}...'")
         
-        # Domain-specific validation
-        if domain == 'code':
-            # Must contain programming-related terms for code domain
-            code_indicators = ['python', 'code', 'programming', 'function', 'variable', 'syntax', 'example', 'script', 'library', 'def ', 'class', 'import', 'algorithm', 'development', 'software']
-            code_matches = sum(1 for indicator in code_indicators if indicator in response_lower)
-            if code_matches == 0:
-                print(f"⚠️  No code indicators found in response for code domain")
-                return True
-            print(f"✅ Found {code_matches} code indicators")
-            
-        elif domain == 'medical':
-            # Must contain medical terminology
-            medical_indicators = ['medical', 'health', 'treatment', 'clinical', 'patient', 'diagnosis', 'therapy', 'healthcare', 'medicine', 'doctor']
-            medical_matches = sum(1 for indicator in medical_indicators if indicator in response_lower)
-            if medical_matches == 0:
-                print(f"⚠️  No medical indicators found in response for medical domain")
-                return True
-            print(f"✅ Found {medical_matches} medical indicators")
-            
-        elif domain == 'science':
-            # Must contain scientific terminology
-            science_indicators = ['research', 'study', 'analysis', 'experiment', 'theory', 'hypothesis', 'scientific', 'methodology', 'data', 'evidence']
-            science_matches = sum(1 for indicator in science_indicators if indicator in response_lower)
-            if science_matches == 0:
-                print(f"⚠️  No science indicators found in response for science domain")
-                return True
-            print(f"✅ Found {science_matches} science indicators")
-                
+        # Be much more lenient - only reject truly problematic responses
+        
         # Check if response is just repeating the prompt without answering
         if len(prompt_lower) > 10 and response_lower.startswith(prompt_lower[:15]):
             print(f"⚠️  Response just repeats the prompt")
             return True
             
-        # Check for overly generic responses
+        # Only reject if response is extremely generic (multiple generic phrases)
         generic_patterns = [
             'this is a complex topic',
             'there are many factors to consider',
@@ -1896,355 +1884,50 @@ COMPREHENSIVE RESPONSE:"""
         ]
         
         generic_count = sum(1 for pattern in generic_patterns if pattern in response_lower)
-        if generic_count >= 2:  # Too many generic phrases
+        
+        # Only reject if response has 3+ generic phrases (very high threshold)
+        if generic_count >= 3:
             print(f"⚠️  Too many generic phrases ({generic_count})")
             return True
             
-        # Check for responses that don't actually answer the question
+        # For questions, accept any response with at least 8 words
         question_indicators = ['what', 'how', 'why', 'when', 'where', 'which', 'explain', 'describe', 'create', 'write', 'make', 'build']
         if any(indicator in prompt_lower for indicator in question_indicators):
-            # This is clearly a question, response should provide specific information
-            if len(response.split()) < 30:  # Very short response to a clear question
-                print(f"⚠️  Very short response ({len(response.split())} words) to a clear question")
+            if len(response.split()) < 8:  # Very low threshold - just ensure it's not empty
+                print(f"⚠️  Very short response ({len(response.split())} words) to a question")
                 return True
                 
         print(f"✅ Response passed quality checks")
         return False
     
     def _generate_ultimate_fallback(self, prompt: str, domain: str) -> str:
-        """Ultimate fallback responses with maximum quality"""
+        """Ultimate fallback responses - minimal templates, let the model do the work"""
         
-        # Special handling for self-introduction prompts
         prompt_lower = prompt.lower()
+        
+        # Only special case: self-introduction
         if any(phrase in prompt_lower for phrase in ['tell me about yourself', 'who are you', 'what are you']):
-            return """**🐍 Mamba Encoder Swarm AI Assistant**
-
-I'm an advanced AI language model powered by the Mamba Encoder Swarm architecture, designed to provide intelligent, helpful, and accurate responses across multiple domains.
-
-**🎯 Core Capabilities:**
-• **Multi-Domain Expertise**: Specialized knowledge in medical, legal, programming, scientific, creative, and business domains
-• **Intelligent Routing**: Advanced encoder routing system that directs queries to the most appropriate specialized modules
-• **Quality Assurance**: Built-in content validation and safety filtering to ensure appropriate, helpful responses
-• **Adaptive Processing**: Dynamic model selection and optimization based on query complexity and requirements
-
-**🧠 Architecture Features:**
-• **State-Space Models**: Utilizes advanced Mamba encoder technology (GPU-ready) with intelligent CPU alternatives
-• **Domain Intelligence**: Sophisticated domain detection and specialized response generation
-• **Performance Monitoring**: Real-time analytics and optimization for consistent high-quality responses
-• **Safety Systems**: Multiple layers of content filtering and quality validation
-
-**🤝 How I Can Help:**
-I'm here to assist with questions, analysis, problem-solving, creative tasks, technical explanations, and professional guidance across various fields. I aim to provide thoughtful, accurate, and helpful responses while maintaining appropriate professional standards.
-
-**Current Status**: Operating in CPU-optimized mode with Mamba encoders ready for GPU activation."""
+            return """I'm an AI assistant powered by the Mamba Encoder Swarm architecture. I'm designed to help with questions across multiple domains including programming, science, business, creative writing, and general knowledge. How can I help you today?"""
         
-        fallback_responses = {
-            'medical': f"""**🏥 Medical Information Analysis: "{prompt[:60]}..."**
-
-**Clinical Overview:**
-This medical topic requires careful consideration of multiple clinical factors and evidence-based approaches to patient care.
-
-**Key Medical Considerations:**
-• **Diagnostic Approach**: Comprehensive clinical evaluation using established diagnostic criteria and evidence-based protocols
-• **Treatment Modalities**: Multiple therapeutic options available, requiring individualized assessment of patient factors, contraindications, and treatment goals
-• **Risk Stratification**: Important to assess patient-specific risk factors, comorbidities, and potential complications
-• **Monitoring Protocols**: Regular follow-up and monitoring essential for optimal outcomes and early detection of adverse effects
-• **Multidisciplinary Care**: May benefit from coordinated care involving multiple healthcare specialties
-
-**Evidence-Based Recommendations:**
-Current medical literature and clinical guidelines suggest a systematic approach incorporating patient history, physical examination, appropriate diagnostic testing, and risk-benefit analysis of treatment options.
-
-**⚠️ Important Medical Disclaimer:** This information is for educational purposes only and does not constitute medical advice. Always consult with qualified healthcare professionals for medical concerns, diagnosis, and treatment decisions.""",
-
-            'legal': f"""**⚖️ Legal Analysis Framework: "{prompt[:60]}..."**
-
-**Legal Context:**
-This legal matter involves complex considerations within applicable legal frameworks and requires careful analysis of relevant statutes, regulations, and case law.
-
-**Key Legal Elements:**
-• **Jurisdictional Analysis**: Legal requirements vary by jurisdiction, requiring analysis of applicable federal, state, and local laws
-• **Statutory Framework**: Relevant statutes, regulations, and legal precedents must be carefully examined
-• **Procedural Requirements**: Proper legal procedures, documentation, and compliance with procedural rules are essential
-• **Rights and Obligations**: All parties have specific legal rights and responsibilities under applicable law
-• **Risk Assessment**: Potential legal risks, liabilities, and consequences should be carefully evaluated
-
-**Professional Legal Guidance:**
-Complex legal matters require consultation with qualified legal professionals who can provide jurisdiction-specific advice and representation.
-
-**⚠️ Legal Disclaimer:** This information is for general educational purposes only and does not constitute legal advice. Consult with qualified attorneys for specific legal matters and jurisdiction-specific guidance.""",
-
-            'code': f"""**💻 Advanced Programming Solution: "{prompt[:60]}..."**
-
-```python
-class AdvancedSolution:
-    \"\"\"
-    Comprehensive implementation addressing: {prompt[:50]}...
-    
-    Features:
-    - Robust error handling and logging
-    - Performance optimization techniques
-    - Comprehensive input validation
-    - Scalable and maintainable architecture
-    \"\"\"
-    
-    def __init__(self, config: Dict[str, Any] = None):
-        self.config = config or {{}}
-        self.logger = self._setup_logging()
-        self._validate_configuration()
-    
-    def _setup_logging(self) -> logging.Logger:
-        \"\"\"Configure comprehensive logging system\"\"\"
-        logger = logging.getLogger(self.__class__.__name__)
-        if not logger.handlers:
-            handler = logging.StreamHandler()
-            formatter = logging.Formatter(
-                '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-            )
-            handler.setFormatter(formatter)
-            logger.addHandler(handler)
-            logger.setLevel(logging.INFO)
-        return logger
-    
-    def _validate_configuration(self) -> None:
-        \"\"\"Validate system configuration and requirements\"\"\"
-        required_keys = ['input_validation', 'error_handling', 'performance_optimization']
-        for key in required_keys:
-            if key not in self.config:
-                self.config[key] = True
-                self.logger.info(f"Using default configuration for {{key}}")
-    
-    def process_request(self, input_data: Any) -> Dict[str, Any]:
-        \"\"\"
-        Main processing method with comprehensive error handling
-        
-        Args:
-            input_data: Input data to process
-            
-        Returns:
-            Dict containing processed results and metadata
-            
-        Raises:
-            ValueError: If input validation fails
-            ProcessingError: If processing encounters unrecoverable error
-        \"\"\"
-        try:
-            # Input validation
-            if self.config.get('input_validation', True):
-                validated_input = self._validate_input(input_data)
-            else:
-                validated_input = input_data
-            
-            # Core processing with performance monitoring
-            start_time = time.time()
-            result = self._core_processing_logic(validated_input)
-            processing_time = time.time() - start_time
-            
-            # Output validation and formatting
-            formatted_result = self._format_output(result)
-            
-            # Return comprehensive result with metadata
-            return {{
-                'success': True,
-                'result': formatted_result,
-                'processing_time': processing_time,
-                'metadata': {{
-                    'input_type': type(input_data).__name__,
-                    'output_type': type(formatted_result).__name__,
-                    'timestamp': datetime.now().isoformat()
-                }}
-            }}
-            
-        except ValueError as e:
-            self.logger.error(f"Input validation error: {{e}}")
-            return self._create_error_response("VALIDATION_ERROR", str(e))
-        
-        except Exception as e:
-            self.logger.error(f"Processing error: {{e}}", exc_info=True)
-            return self._create_error_response("PROCESSING_ERROR", str(e))
-    
-    def _validate_input(self, input_data: Any) -> Any:
-        \"\"\"Comprehensive input validation\"\"\"
-        if input_data is None:
-            raise ValueError("Input data cannot be None")
-        
-        # Additional validation logic based on input type
-        return input_data
-    
-    def _core_processing_logic(self, validated_input: Any) -> Any:
-        \"\"\"Core business logic implementation\"\"\"
-        # Implement your core algorithm here
-        # This is where the main processing occurs
-        return validated_input  # Placeholder
-    
-    def _format_output(self, result: Any) -> Any:
-        \"\"\"Format output for consumption\"\"\"
-        # Apply output formatting and normalization
-        return result
-    
-    def _create_error_response(self, error_type: str, message: str) -> Dict[str, Any]:
-        \"\"\"Create standardized error response\"\"\"
-        return {{
-            'success': False,
-            'error': {{
-                'type': error_type,
-                'message': message,
-                'timestamp': datetime.now().isoformat()
-            }}
-        }}
-
-# Example usage with comprehensive error handling
-if __name__ == "__main__":
-    try:
-        solution = AdvancedSolution({{
-            'input_validation': True,
-            'error_handling': True,
-            'performance_optimization': True
-        }})
-        
-        result = solution.process_request("your_input_data")
-        
-        if result['success']:
-            print(f"✅ Processing successful: {{result['result']}}")
-            print(f"⏱️  Processing time: {{result['processing_time']:.4f}}s")
-        else:
-            print(f"❌ Processing failed: {{result['error']['message']}}")
-            
-    except Exception as e:
-        print(f"❌ System error: {{e}}")
-```
-
-**🚀 Advanced Features:**
-• **Comprehensive Error Handling**: Multi-level exception handling with detailed logging
-• **Performance Optimization**: Built-in performance monitoring and optimization techniques
-• **Input/Output Validation**: Robust validation and sanitization of data
-• **Scalable Architecture**: Designed for maintainability and extensibility
-• **Production-Ready**: Includes logging, configuration management, and error recovery""",
-
-            'science': f"""**🔬 Scientific Research Analysis: "{prompt[:60]}..."**
-
-**Research Framework:**
-This scientific topic represents an active area of research with significant implications for advancing our understanding of complex natural phenomena and their applications.
-
-**Methodological Approach:**
-• **Hypothesis Development**: Based on current theoretical frameworks, empirical observations, and peer-reviewed literature
-• **Experimental Design**: Controlled studies utilizing rigorous scientific methodology, appropriate controls, and statistical power analysis
-• **Data Collection & Analysis**: Systematic data gathering using validated instruments and advanced analytical techniques
-• **Peer Review Process**: Findings validated through independent peer review and replication studies
-• **Statistical Validation**: Results analyzed using appropriate statistical methods with consideration of effect sizes and confidence intervals
-
-**Current State of Knowledge:**
-• **Established Principles**: Well-documented foundational concepts supported by extensive empirical evidence
-• **Emerging Research**: Recent discoveries and ongoing investigations expanding the knowledge base
-• **Technological Applications**: Practical applications and technological developments emerging from research
-• **Research Gaps**: Areas requiring additional investigation and methodological development
-• **Future Directions**: Promising research avenues and potential breakthrough areas
-
-**Interdisciplinary Connections:**
-The topic intersects with multiple scientific disciplines, requiring collaborative approaches and cross-disciplinary methodology to fully understand complex relationships and mechanisms.
-
-**Research Impact:**
-Current findings have implications for theoretical understanding, practical applications, and future research directions across multiple scientific domains.
-
-**📚 Scientific Note:** Information based on current peer-reviewed research and scientific consensus, which continues to evolve through ongoing investigation and discovery.""",
-
-            'creative': f"""**✨ Creative Narrative: "{prompt[:60]}..."**
-
-**Opening Scene:**
-In a realm where imagination transcends the boundaries of reality, there existed a story of extraordinary depth and meaning, waiting to unfold across the tapestry of human experience...
-
-The narrative begins in a place both familiar and strange, where characters emerge not as mere constructs of fiction, but as living embodiments of universal truths and human aspirations. Each individual carries within them a unique perspective shaped by their experiences, dreams, and the challenges that define their journey.
-
-**Character Development:**
-The protagonist stands at the threshold of transformation, facing choices that will define not only their destiny but the very fabric of the world around them. Supporting characters weave through the narrative like threads in an intricate tapestry, each contributing essential elements to the unfolding drama.
-
-**Plot Progression:**
-• **Act I - Discovery**: The journey begins with the revelation of hidden truths and the call to adventure
-• **Act II - Challenge**: Obstacles emerge that test resolve, character, and the strength of human bonds
-• **Act III - Transformation**: Through struggle and growth, characters evolve and discover their true purpose
-• **Resolution**: The story concludes with meaningful resolution while leaving space for continued growth and possibility
-
-**Thematic Elements:**
-The narrative explores profound themes of human nature, resilience, love, sacrifice, and the eternal quest for meaning and connection. Through metaphor and symbolism, the story speaks to universal experiences while maintaining its unique voice and perspective.
-
-**Literary Techniques:**
-• **Imagery**: Vivid descriptions that engage all senses and create immersive experiences
-• **Symbolism**: Meaningful symbols that add layers of interpretation and emotional resonance
-• **Character Arc**: Carefully crafted character development showing growth and transformation
-• **Dialogue**: Authentic conversations that reveal character and advance the plot
-• **Pacing**: Strategic rhythm that maintains engagement while allowing for reflection
-
-**Creative Vision:**
-This narrative represents a fusion of imagination and insight, creating a story that entertains while offering deeper meaning and emotional connection to readers across diverse backgrounds and experiences.
-
-*The story continues to unfold with each chapter, revealing new dimensions of meaning and possibility...*""",
-
-            'business': f"""**💼 Strategic Business Analysis: "{prompt[:60]}..."**
-
-**Executive Summary:**
-This business opportunity requires comprehensive strategic analysis incorporating market dynamics, competitive positioning, operational excellence, and sustainable growth strategies to achieve optimal organizational outcomes.
-
-**Strategic Framework:**
-• **Market Analysis**: Comprehensive evaluation of market size, growth trends, customer segments, and competitive landscape
-• **Competitive Intelligence**: Analysis of key competitors, market positioning, strengths, weaknesses, and strategic opportunities
-• **Value Proposition**: Clear articulation of unique value delivery and competitive advantages
-• **Resource Allocation**: Optimal distribution of human capital, financial resources, and technological assets
-• **Risk Management**: Identification, assessment, and mitigation of business risks and market uncertainties
-
-**Implementation Strategy:**
-• **Phase 1 - Foundation**: Market research, stakeholder alignment, and strategic planning (Months 1-3)
-• **Phase 2 - Development**: Product/service development, team building, and system implementation (Months 4-9)
-• **Phase 3 - Launch**: Market entry, customer acquisition, and performance optimization (Months 10-12)
-• **Phase 4 - Scale**: Growth acceleration, market expansion, and operational excellence (Months 13+)
-
-**Financial Projections:**
-• **Revenue Model**: Multiple revenue streams with diversified income sources and scalable growth potential
-• **Cost Structure**: Optimized operational costs with focus on efficiency and scalability
-• **Investment Requirements**: Strategic capital allocation for maximum ROI and sustainable growth
-• **Break-even Analysis**: Projected timeline to profitability with scenario planning and sensitivity analysis
-
-**Key Performance Indicators:**
-• **Financial Metrics**: Revenue growth, profit margins, cash flow, and return on investment
-• **Operational Metrics**: Customer acquisition cost, customer lifetime value, and operational efficiency
-• **Market Metrics**: Market share, brand recognition, and customer satisfaction scores
-• **Innovation Metrics**: New product development, time-to-market, and competitive advantage sustainability
-
-**Recommendations:**
-Based on comprehensive analysis of market conditions, competitive dynamics, and organizational capabilities, the recommended approach emphasizes sustainable growth through innovation, operational excellence, and strategic partnerships.
-
-**📊 Business Intelligence:** Analysis based on current market data, industry best practices, and proven business methodologies.""",
-
-            'general': f"""**🎯 Comprehensive Analysis: "{prompt[:60]}..."**
-
-**Overview:**
-Your inquiry touches upon several interconnected concepts that warrant thorough examination from multiple perspectives, incorporating both theoretical frameworks and practical applications.
-
-**Multi-Dimensional Analysis:**
-• **Conceptual Foundation**: The underlying principles that form the basis of understanding, drawing from established theories and empirical evidence
-• **Historical Context**: Evolution of thought and practice in this area, including key developments and paradigm shifts
-• **Current Landscape**: Present-day understanding, trends, and developments that shape contemporary perspectives
-• **Stakeholder Perspectives**: Different viewpoints from various stakeholders, each contributing unique insights and considerations
-• **Practical Applications**: Real-world implementations and their outcomes, successes, and lessons learned
-
-**Critical Examination:**
-The topic involves complex interactions between multiple variables and factors that influence outcomes across different contexts and applications. Understanding these relationships requires careful analysis of causation, correlation, and contextual factors.
-
-**Key Considerations:**
-• **Complexity Factors**: Multiple interconnected elements that create emergent properties and non-linear relationships
-• **Environmental Variables**: External factors and conditions that influence outcomes and effectiveness
-• **Scalability Issues**: Considerations for implementation across different scales and contexts
-• **Sustainability Aspects**: Long-term viability and environmental, social, and economic sustainability
-• **Innovation Opportunities**: Areas for advancement, improvement, and breakthrough developments
-
-**Synthesis and Insights:**
-Through careful examination of available evidence and multiple perspectives, several key insights emerge that can inform decision-making and future development in this area.
-
-**Future Directions:**
-Continued research, development, and practical application will likely yield additional insights and improvements, contributing to our evolving understanding and capability in this domain.
-
-**🔍 Analytical Note:** This analysis draws upon interdisciplinary knowledge and multiple sources of information to provide a comprehensive perspective on your inquiry."""
+        # For all other cases, provide a very simple domain-aware response
+        domain_intros = {
+            'medical': "Regarding your medical question",
+            'legal': "Concerning your legal question", 
+            'code': "For your programming question",
+            'science': "Regarding your scientific question",
+            'creative': "For your creative request",
+            'business': "Concerning your business question",
+            'geography': "Regarding your geography question",
+            'general': "Regarding your question"
         }
         
-        return fallback_responses.get(domain, fallback_responses['general'])
+        intro = domain_intros.get(domain, "Regarding your question")
+        
+        return f"""{intro}: {prompt}
+
+I understand you're asking about this topic. Let me provide you with a helpful response based on my knowledge and training. This appears to be a {domain} domain question, and I'll do my best to give you accurate and useful information.
+
+If you need more specific details or have follow-up questions, please feel free to ask for clarification on any particular aspect you're most interested in."""
     
     def _create_ultimate_routing_display(self, routing_info: Dict, generation_time: float, token_count: int) -> str:
         """Create ultimate routing display with all advanced metrics"""
